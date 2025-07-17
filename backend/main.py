@@ -3,12 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from . import models, schemas
-from .database import engine, SessionLocal
+from .database import engine, get_db
 from .routers import auth
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+app.include_router(auth.router)
 
 origins = ["*"]
 app.add_middleware(
@@ -18,12 +19,6 @@ app.add_middleware(
     allow_headers = ["*"]
 )
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 @app.post('/posts', response_model=schemas.Post, status_code=status.HTTP_201_CREATED)

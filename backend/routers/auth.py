@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from .. import models, schemas, security
-from ..main import get_db
+from ..database import get_db
 
 router = APIRouter(
     tags=['Authorization']
@@ -85,7 +85,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credential_exception
     
 
-    db_user = db.query(models.User).filter(models.User.username == tokenData.username)
+    db_user = db.query(models.User).filter(models.User.username == tokenData.username).first()
 
     if not db_user:
         raise credential_exception
