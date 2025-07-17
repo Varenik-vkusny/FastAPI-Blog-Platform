@@ -28,6 +28,7 @@ class User(BaseModel):
 class Post(PostBase):
     id: int
     created_at: datetime
+    owner: User
 
     class Config():
         from_attributes=True

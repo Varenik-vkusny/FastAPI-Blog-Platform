@@ -27,9 +27,9 @@ def get_db():
 
 
 @app.post('/posts', response_model=schemas.Post, status_code=status.HTTP_201_CREATED)
-async def create_post(post: schemas.PostCreate, db: Session = Depends(get_db)):
+async def create_post(post: schemas.PostCreate, db: Session = Depends(get_db), current_user = Depends(auth.get_current_user)):
 
-    new_post = models.Post(**post.dict())
+    new_post = models.Post(**post.dict(), owner_id = current_user.id)
 
     db.add(new_post)
     db.commit()
