@@ -36,7 +36,7 @@ async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post('/token', response_model=schemas.Token, status_code=status.HTTP_200_OK)
-async def login(user: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(user: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
 
     db_user = db.query(models.User).filter(models.User.username == user.username).first()
 
@@ -46,17 +46,21 @@ async def login(user: OAuth2PasswordRequestForm = Depends(), db: Session = Depen
             detail='Неправильный ник или пароль',
             headers={'WWW-Authenticate': 'Bearer'}
         )
+        
     
-    if security.verify_password(user.password, db_user.password_hash):
+    if not security.verify_password(user.password, db_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail='Неправильный ник или пароль',
             headers={'WWW-Authenticate': 'Bearer'}
         )
+        
     
-    user_data = {'sub': user.username}
+    user_data = {'sub': db_user.username}
 
     access_token = security.create_access_token(data=user_data)
+
+    print(f'Создал токен {access_token}')
     
     return {
         'access_token': access_token,

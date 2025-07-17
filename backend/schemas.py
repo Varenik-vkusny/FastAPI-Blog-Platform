@@ -29,6 +29,7 @@ class Post(PostBase):
     id: int
     created_at: datetime
     owner: User
+    likes_count: int=0
 
     class Config():
         from_attributes=True
