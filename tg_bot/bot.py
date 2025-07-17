@@ -42,7 +42,7 @@ main_kb = ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text='Регистрация'),
-            KeyboardButton(text='Вход')
+            KeyboardButton(text='Войти')
         ],
         [
             KeyboardButton(text='Посты'),
@@ -133,7 +133,7 @@ async def login_password_handler(message: types.Message, state: FSMContext):
     
     user_data = await state.get_data()
     username = user_data.get('username')
-    password = message.text()
+    password = message.text
 
     login_data = {
         'username': username,
@@ -144,7 +144,7 @@ async def login_password_handler(message: types.Message, state: FSMContext):
         try:
             response = await client.post(f'{API_BASE_URL}/token', data=login_data)
 
-            if response.status_code != 201:
+            if response.status_code != 200:
                 error_detail = response.json().get('detail', 'Неправильный ник или пароль')
                 await message.answer(f'Произошла ошибка: {error_detail}')
                 return
@@ -211,7 +211,7 @@ async def title_handler(message: types.Message, state: FSMContext):
 async def content_handler(message: types.Message, state: FSMContext):
 
     user_id = message.from_user.id
-    access_token = users_token.get(access_token)
+    access_token = users_token.get(user_id)
 
     if not access_token:
         await message.answer('Вы не авторизованы!')
