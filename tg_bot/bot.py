@@ -52,6 +52,18 @@ main_kb = ReplyKeyboardMarkup(
 )
 
 
+def get_inline_kb(post_id: int, current_likes: int):
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=f'👍 {current_likes}', callback_data=f'like_{post_id}')
+            ]
+        ]
+    )
+
+    return keyboard
+
+
 router = Router()
 
 
@@ -178,17 +190,67 @@ async def get_posts_handler(message: types.Message, state: FSMContext):
                 return
             
             for post in posts:
+
                 text = (
                     f'📄 *{post['title']}*\n\n'
                     f'{post['content']}\n\n'
                     f'Автор: {post['owner']['username']} | {post['created_at']}'
                 )
 
-                await message.answer(text=text, parse_mode='Markdown')
+                likes_count = post.get('likes_count', 0)
+                post_id = post['id']        
+
+                await message.answer(text=text, parse_mode='Markdown', reply_markup=get_inline_kb(post_id=post_id, current_likes=likes_count))
         except httpx.HTTPStatusError as e:
             await message.answer(f'Произошла ошибка при загрузка постов: {e.response.status_code}')
         except httpx.RequestError:
             await message.answer('Не удалось подключиться к серверу')
+
+
+@router.callback_query(F.data.startswith('like_'))
+async def like_handler(callback: types.CallbackQuery):
+
+    access_token = users_token.get(callback.from_user.id)
+
+    if not access_token:
+        await callback.answer('Вы должны быть авторизованы для того чтобы поставить лайк!', show_alert=True)
+        return
+    
+    post_id = int(callback.data.split('_')[1])
+
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(f'{API_BASE_URL}/post/{post_id}/like', headers=headers)
+
+            if response.status_code == 401:
+                await callback.answer('Ваша сессия истекла, пожалуйста войдите снова!', show_alert=True)
+                return
+
+            if response.status_code != 200:
+                error_detail = response.json().get('detail', 'Ошибка при лайке поста')
+                await callback.answer(f'Произошла ошибка: {error_detail}', show_alert=True)
+                return
+            
+            get_response = await client.get(f'{API_BASE_URL}/posts')
+            get_response.raise_for_status
+            posts = get_response.json()
+
+            post_to_update = next((p for p in posts if p['id'] == post_id))
+
+            if post_to_update:
+
+                new_kb = get_inline_kb(post_id=post_id, current_likes=post_to_update.get('likes_count', 0))
+
+                await callback.message.edit_reply_markup(reply_markup=new_kb)
+                
+                await callback.answer(text=response.json().get('detail'))
+        except httpx.RequestError:
+            await callback.answer('Не удалось подключиться к серверу.', show_alert=True)
+    await callback.answer(f'Вы лайкнули пост №{post_id}', show_alert=True)    
 
 
 @router.message(F.text == 'Создать пост')
