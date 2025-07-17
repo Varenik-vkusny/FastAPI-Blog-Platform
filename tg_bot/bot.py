@@ -2,7 +2,7 @@ import os
 import httpx
 import logging
 import asyncio
-from aiogram import Router, Dispatcher, types, F
+from aiogram import Router, Dispatcher, types, Bot, F
 from aiogram.filters import CommandStart
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
@@ -31,6 +31,11 @@ class RegisterStates(StatesGroup):
 class LoginStates(StatesGroup):
     waiting_for_username = State()
     waiting_for_password = State()
+
+
+class CreatePostStates(StatesGroup):
+    waiting_for_title = State()
+    waiting_for_content = State()
 
 
 main_kb = ReplyKeyboardMarkup(
@@ -153,3 +158,110 @@ async def login_password_handler(message: types.Message, state: FSMContext):
         except httpx.RequestError:
             await message.answer('Не удалось подключиться к серверу.')
     await state.clear()
+
+
+@router.message(F.text == 'Посты')
+async def get_posts_handler(message: types.Message, state: FSMContext):
+
+    await message.answer('Загружаю посты')
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(f'{API_BASE_URL}/posts')
+
+            response.raise_for_status()
+
+            posts = response.json()
+
+            if not posts:
+                await message.answer('Пока нет ни одно поста.')
+                return
+            
+            for post in posts:
+                text = (
+                    f'📄 *{post['title']}*\n\n'
+                    f'{post['content']}\n\n'
+                    f'Автор: {post['owner']['username']} | {post['created_at']}'
+                )
+
+                await message.answer(text=text, parse_mode='Markdown')
+        except httpx.HTTPStatusError as e:
+            await message.answer(f'Произошла ошибка при загрузка постов: {e.response.status_code}')
+        except httpx.RequestError:
+            await message.answer('Не удалось подключиться к серверу')
+
+
+@router.message(F.text == 'Создать пост')
+async def create_post_handler(message: types.Message, state: FSMContext):
+    await message.answer('Давайте создадим новый пост! Введите титл для поста:')
+
+    await state.set_state(CreatePostStates.waiting_for_title)
+
+
+@router.message(CreatePostStates.waiting_for_title)
+async def title_handler(message: types.Message, state: FSMContext):
+    await state.update_data(title=message.text)
+
+    await message.answer('Отлично! Теперь введите текст для поста:')
+
+    await state.set_state(CreatePostStates.waiting_for_content)
+
+
+@router.message(CreatePostStates.waiting_for_content)
+async def content_handler(message: types.Message, state: FSMContext):
+
+    user_id = message.from_user.id
+    access_token = users_token.get(access_token)
+
+    if not access_token:
+        await message.answer('Вы не авторизованы!')
+        await state.clear()
+        return
+
+    post_data = await state.get_data()
+    title = post_data.get('title')
+    content = message.text
+
+    post_data = {
+        'title': title,
+        'content': content
+    }
+
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(f'{API_BASE_URL}/posts', json=post_data, headers=headers)
+
+            if response.status_code == 401:
+                await message.answer('Ваша сессия истекла, пожалуйста войдите снова!')
+                return
+            elif response.status_code != 201:
+                error_detail = response.json().get('detail', 'Неизвестная ошибка!')
+                await message.answer(f'Произошла ошибка: {error_detail}')
+            else:
+                new_post = response.json()
+                await message.answer(f'Ваш пост {new_post['title']} успешно создан!')
+        except httpx.RequestError:
+            await message.answer('Не удалось подключиться к серверу.')
+    await state.clear()
+
+
+@router.message()
+async def echo_handler(message: types.Message):
+    await message.answer('Неизвестное сообщение.')
+
+
+async def main():
+    bot = Bot(BOT_TOKEN)
+    dp = Dispatcher()
+    dp.include_router(router)
+
+    await dp.start_polling(bot)
+
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(main())
