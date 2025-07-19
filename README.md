@@ -48,7 +48,7 @@ This project showcases skills in building modern web services, asynchronous prog
     *   🛡️ Secure password storage using hashing (bcrypt).
     *   🔑 JWT-based authentication system (OAuth2 standard).
 *   **Content Management:**
-    *   ✍️ CRUD operations for posts (Create and Read implemented).
+    *   ✍️ CRUD operations for posts (Create, Update and Read implemented).
     *   👍 Like system tied to users with protection against duplicate likes.
 *   **Telegram Bot as a Client:**
     *   🤖 Full account management (`/register`, `/login`) through the bot's interface.
