@@ -44,7 +44,7 @@ async def get_posts(step: int=0, limit: int=100, db: Session = Depends(get_db)):
     return posts_with_likes
 
 
-@router.put('/posts/{post_id}', response_model=schemas.Post, status_code=status.HTTP_200_OK)
+@router.put('/post/{post_id}', response_model=schemas.Post, status_code=status.HTTP_200_OK)
 async def update_post(post_id: int, update_post: schemas.PostBase, db: Session = Depends(get_db), current_user = Depends(auth.get_current_user)):
 
     post_query = db.query(models.Post).filter(models.Post.id == post_id)
@@ -67,6 +67,31 @@ async def update_post(post_id: int, update_post: schemas.PostBase, db: Session =
     db.commit()
 
     return db_post
+
+
+
+@router.delete('/post/{post_id}', status_code=status.HTTP_200_OK)
+async def delete_post(post_id: int, db: Session = Depends(get_db), current_user = Depends(auth.get_current_user)):
+
+    db_post = db.query(models.Post).filter(models.Post.id == post_id).first()
+
+    if not db_post:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Пост №{post_id} не найден!'
+        )
+    
+    if current_user.id != db_post.owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='У вас недостаточно прав на удаление этого поста!'
+        )
+    
+    db.delete(db_post)
+
+    db.commit()
+
+    return {'detail': f'Пост №{post_id} успешно удален!'}
 
 
 @router.post('/post/{post_id}/like')

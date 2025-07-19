@@ -1,37 +1,13 @@
-import os
 import httpx
-import logging
-import asyncio
-from aiogram import Router, Dispatcher, types, Bot, F
-from aiogram.filters import CommandStart
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from pathlib import Path
-from dotenv import load_dotenv
+from ..keyboards.inline_kb import get_inline_kb
+from ..core.config import settings
 
-current_file_path = Path(__file__)
 
-project_root = current_file_path.parent.parent
-
-env_path = project_root / ".env"
-
-load_dotenv(dotenv_path=env_path)
-
-BOT_TOKEN = os.getenv('BOT_TOKEN')
-API_BASE_URL = os.getenv('API_BASE_URL')
+API_BASE_URL = settings.api_base_url
 users_token = {}
-
-
-class RegisterStates(StatesGroup):
-    waiting_for_username = State()
-    waiting_for_password = State()
-
-
-class LoginStates(StatesGroup):
-    waiting_for_username = State()
-    waiting_for_password = State()
-
 
 class CreatePostStates(StatesGroup):
     waiting_for_title = State()
@@ -43,141 +19,10 @@ class UpdatePostStates(StatesGroup):
     waiting_for_new_content = State()
 
 
-main_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [
-            KeyboardButton(text='Регистрация'),
-            KeyboardButton(text='Войти')
-        ],
-        [
-            KeyboardButton(text='Посты'),
-            KeyboardButton(text='Создать пост')
-        ]
-    ]
-)
-
-
-def get_inline_kb(post_id: int, current_likes: int):
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text=f'👍 {current_likes}', callback_data=f'like_{post_id}'),
-                InlineKeyboardButton(text='Изменить пост', callback_data=f'update_{post_id}')
-            ]
-        ]
-    )
-
-    return keyboard
-
-
 router = Router()
 
 
-@router.message(CommandStart())
-async def start_handler(message: types.Message):
-    await message.answer('Привет! Я телеграм бот, у которого бэкенд написан на FastAPI фреймворке.', reply_markup=main_kb)
-
-
-@router.message(F.text == 'Регистрация')
-async def start_register(message: types.Message, state: FSMContext):
-
-    await message.answer('Давайте начнем регистрацию! Введите ник: ')
-
-    await state.set_state(RegisterStates.waiting_for_username)
-
-
-@router.message(RegisterStates.waiting_for_username)
-async def register_username_handler(message: types.Message, state: FSMContext):
-    if not message.text:
-        await message.answer('Вы не ввели ник! Попробуйте еще раз.')
-        return
-    
-    await state.update_data(username=message.text)
-
-    await message.answer('Отлично! Теперь введите пароль (минимум 3 символа):')
-
-    await state.set_state(RegisterStates.waiting_for_password)
-
-
-@router.message(RegisterStates.waiting_for_password)
-async def register_password_handler(message: types.Message, state: FSMContext):
-
-    if len(message.text) < 3:
-        await message.answer('Ваш пароль слишком маленький! Попробуйте еще раз.')
-        return
-
-    user_data = await state.get_data()
-    username = user_data.get('username')
-    password = message.text
-
-    register_data = {
-        'username': username,
-        'password': password
-    }
-
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(f'{API_BASE_URL}/register', json=register_data)
-
-            if response.status_code != 201:
-                error_detail = response.json().get('detail', 'Неизвестная ошибка')
-                await message.answer(f'Произошла ошибка: {error_detail}')
-            else:
-                new_user = response.json()
-                await message.answer(f'Регистрация прошла успешно! Ваш id: {new_user['id']}, ваш ник: {new_user['username']}')
-        except httpx.RequestError:
-            await message.answer('не удалось подключиться к серверу')
-    await state.clear()
-
-
-@router.message(F.text == 'Войти')
-async def start_login(message: types.Message, state: FSMContext):
-    await message.answer('Давайте начнем процесс аутентификации! Введите ваш ник: ')
-
-    await state.set_state(LoginStates.waiting_for_username)
-
-
-@router.message(LoginStates.waiting_for_username)
-async def login_username_handler(message: types.Message, state: FSMContext):
-    await state.update_data(username=message.text)
-
-    await message.answer('Отлично! Теперь введите ваш пароль:')
-
-    await state.set_state(LoginStates.waiting_for_password)
-
-
-@router.message(LoginStates.waiting_for_password)
-async def login_password_handler(message: types.Message, state: FSMContext):
-    
-    user_data = await state.get_data()
-    username = user_data.get('username')
-    password = message.text
-
-    login_data = {
-        'username': username,
-        'password': password
-    }
-
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(f'{API_BASE_URL}/token', data=login_data)
-
-            if response.status_code != 200:
-                error_detail = response.json().get('detail', 'Неправильный ник или пароль')
-                await message.answer(f'Произошла ошибка: {error_detail}')
-                return
-            
-            token_data = response.json()
-            access_token = token_data.get('access_token')
-            user_id = message.from_user.id
-            users_token[user_id] = access_token
-
-            await message.answer('Вы успешно авторизованы!')
-        except httpx.RequestError:
-            await message.answer('Не удалось подключиться к серверу.')
-    await state.clear()
-
-
+# ---GET POSTS BLOCK---
 @router.message(F.text == 'Посты')
 async def get_posts_handler(message: types.Message, state: FSMContext):
 
@@ -196,14 +41,14 @@ async def get_posts_handler(message: types.Message, state: FSMContext):
                 return
             
             for post in posts:
-                post_id = post['id'] 
 
                 text = (
-                    f'📄 №{post_id} *{post['title']}*\n\n'
+                    f'📄 *{post['title']}*\n\n'
                     f'{post['content']}\n\n'
                     f'Автор: {post['owner']['username']} | {post['created_at']}'
                 )
-
+                
+                post_id = post['id'] 
                 likes_count = post.get('likes_count', 0)       
 
                 await message.answer(text=text, parse_mode='Markdown', reply_markup=get_inline_kb(post_id=post_id, current_likes=likes_count))
@@ -213,6 +58,7 @@ async def get_posts_handler(message: types.Message, state: FSMContext):
             await message.answer('Не удалось подключиться к серверу')
 
 
+# ---LIKE HANDLER BLOCK---
 @router.callback_query(F.data.startswith('like_'))
 async def like_handler(callback: types.CallbackQuery):
 
@@ -253,12 +99,12 @@ async def like_handler(callback: types.CallbackQuery):
 
                 await callback.message.edit_reply_markup(reply_markup=new_kb)
                 
-                await callback.answer(text=response.json().get('detail'))
+                await callback.answer(text=response.json().get('detail'), show_alert=False)
         except httpx.RequestError:
             await callback.answer('Не удалось подключиться к серверу.', show_alert=True)
-    await callback.answer(f'Вы лайкнули пост №{post_id}', show_alert=True)
 
 
+# ---EDIT POST HANDLER BLOCK---
 @router.callback_query(F.data.startswith('update_'))
 async def update_post_start(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
@@ -307,7 +153,7 @@ async def update_content_handler(message: types.Message, state: FSMContext):
 
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.put(f'{API_BASE_URL}/posts/{post_id}', json=post_data, headers=headers)
+            response = await client.put(f'{API_BASE_URL}/post/{post_id}', json=post_data, headers=headers)
 
             if response.status_code == 401:
                 await message.answer('Ваша сессия истекла, пожалуйста авторизуйтесь снова!')
@@ -321,7 +167,7 @@ async def update_content_handler(message: types.Message, state: FSMContext):
 
             post = response.json()
 
-            await message.answer(f'Ваш пост №{post['id']} успешно отредактирован!')
+            await message.answer(f'Ваш пост успешно отредактирован!')
 
             state.clear()
         except httpx.RequestError:
@@ -329,6 +175,43 @@ async def update_content_handler(message: types.Message, state: FSMContext):
             state.clear()
 
 
+# ---DELETE POST HANDLER BLOCK---
+@router.callback_query(F.data.startswith('delete_'))
+async def delete_post_handler(callback: types.CallbackQuery):
+    
+    user_id = callback.from_user.id
+
+    access_token = users_token.get(user_id)
+
+    if not access_token:
+        await callback.message.answer('Чтобы удалить пост вы должны быть авторизованы!')
+        return
+    
+    post_id = int(callback.data.split('_')[1])
+
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.delete(f'{API_BASE_URL}/post/{post_id}', headers=headers)
+
+            if response.status_code == 401:
+                await callback.message.answer('Ваша сессия истекла, пожалуйста авторизуйтесь снова!')
+                return
+            
+            if response.status_code != 200:
+                error_detail = response.json().get('detail', 'Неизвестная ошибка!')
+                await callback.message.answer(f'Произошла ошибка: {error_detail}')
+                return
+            
+            await callback.answer(f'Пост №{post_id} успешно удален!', show_alert=False)
+        except httpx.RequestError:
+            await callback.message.answer('Не удалось подключиться к серверу.')
+
+
+# ---CREATE POST BLOCK---
 @router.message(F.text == 'Создать пост')
 async def create_post_handler(message: types.Message, state: FSMContext):
     await message.answer('Давайте создадим новый пост! Введите титл для поста:')
@@ -385,21 +268,3 @@ async def content_handler(message: types.Message, state: FSMContext):
         except httpx.RequestError:
             await message.answer('Не удалось подключиться к серверу.')
     await state.clear()
-
-
-@router.message()
-async def echo_handler(message: types.Message):
-    await message.answer('Неизвестное сообщение.')
-
-
-async def main():
-    bot = Bot(BOT_TOKEN)
-    dp = Dispatcher()
-    dp.include_router(router)
-
-    await dp.start_polling(bot)
-
-
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    asyncio.run(main())
