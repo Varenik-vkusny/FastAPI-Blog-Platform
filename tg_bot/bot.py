@@ -38,6 +38,11 @@ class CreatePostStates(StatesGroup):
     waiting_for_content = State()
 
 
+class UpdatePostStates(StatesGroup):
+    waiting_for_new_title = State()
+    waiting_for_new_content = State()
+
+
 main_kb = ReplyKeyboardMarkup(
     keyboard=[
         [
@@ -56,7 +61,8 @@ def get_inline_kb(post_id: int, current_likes: int):
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text=f'👍 {current_likes}', callback_data=f'like_{post_id}')
+                InlineKeyboardButton(text=f'👍 {current_likes}', callback_data=f'like_{post_id}'),
+                InlineKeyboardButton(text='Изменить пост', callback_data=f'update_{post_id}')
             ]
         ]
     )
@@ -190,15 +196,15 @@ async def get_posts_handler(message: types.Message, state: FSMContext):
                 return
             
             for post in posts:
+                post_id = post['id'] 
 
                 text = (
-                    f'📄 *{post['title']}*\n\n'
+                    f'📄 №{post_id} *{post['title']}*\n\n'
                     f'{post['content']}\n\n'
                     f'Автор: {post['owner']['username']} | {post['created_at']}'
                 )
 
-                likes_count = post.get('likes_count', 0)
-                post_id = post['id']        
+                likes_count = post.get('likes_count', 0)       
 
                 await message.answer(text=text, parse_mode='Markdown', reply_markup=get_inline_kb(post_id=post_id, current_likes=likes_count))
         except httpx.HTTPStatusError as e:
@@ -250,7 +256,77 @@ async def like_handler(callback: types.CallbackQuery):
                 await callback.answer(text=response.json().get('detail'))
         except httpx.RequestError:
             await callback.answer('Не удалось подключиться к серверу.', show_alert=True)
-    await callback.answer(f'Вы лайкнули пост №{post_id}', show_alert=True)    
+    await callback.answer(f'Вы лайкнули пост №{post_id}', show_alert=True)
+
+
+@router.callback_query(F.data.startswith('update_'))
+async def update_post_start(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+
+    post_id = int(callback.data.split('_')[1])
+
+    await state.update_data(post_id=post_id)
+
+    await callback.message.answer('Введите новый заголовок:')
+    await state.set_state(UpdatePostStates.waiting_for_new_title)
+
+
+@router.message(UpdatePostStates.waiting_for_new_title)
+async def update_title_handler(message: types.Message, state: FSMContext):
+
+    await state.update_data(title=message.text)
+
+    await message.answer('Отлично! Теперь введите новый текст для поста:')
+
+    await state.set_state(UpdatePostStates.waiting_for_new_content)
+
+
+@router.message(UpdatePostStates.waiting_for_new_content)
+async def update_content_handler(message: types.Message, state: FSMContext):
+
+    update_post_data = await state.get_data()
+    post_id = update_post_data.get('post_id')
+    title = update_post_data.get('title')
+    content = message.text
+
+    user_id = message.from_user.id
+    access_token = users_token.get(user_id)
+
+    if not access_token:
+        await message.answer('Чтобы редактировать пост нужно авторизоваться!')
+        return
+    
+    post_data = {
+        'title': title,
+        'content': content
+    }
+
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.put(f'{API_BASE_URL}/posts/{post_id}', json=post_data, headers=headers)
+
+            if response.status_code == 401:
+                await message.answer('Ваша сессия истекла, пожалуйста авторизуйтесь снова!')
+                state.clear()
+                return
+            if response.status_code != 200:
+                error_detail = response.json().get('detail', 'Неизвестная ошибка!')
+                await message.answer(f'Произошла ошибка: {error_detail}')
+                state.clear()
+                return
+
+            post = response.json()
+
+            await message.answer(f'Ваш пост №{post['id']} успешно отредактирован!')
+
+            state.clear()
+        except httpx.RequestError:
+            await message.answer('Не удалось подключиться к серверу.')
+            state.clear()
 
 
 @router.message(F.text == 'Создать пост')
