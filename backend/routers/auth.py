@@ -1,6 +1,7 @@
 from fastapi import APIRouter, status, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from jose import JWTError, jwt
 from .. import models, schemas, security
 from ..database import get_db
@@ -13,9 +14,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
 
 
 @router.post('/register', response_model=schemas.User, status_code=status.HTTP_201_CREATED)
-async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
 
-    user_db = db.query(models.User).filter(models.User.username == user.username).first()
+    user_db_query = select(models.User).filter(models.User.username == user.username)
+
+    user_db_result = await db.execute(user_db_query)
+
+    user_db = user_db_result.scalar_one_or_none()
 
     if user_db:
         raise HTTPException(
@@ -28,17 +33,21 @@ async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     user_db = models.User(username=user.username, password_hash=password_hash)
 
     db.add(user_db)
-    db.commit()
-    db.refresh(user_db)
+    await db.commit()
+    await db.refresh(user_db)
 
     return user_db
 
 
 
 @router.post('/token', response_model=schemas.Token, status_code=status.HTTP_200_OK)
-def login(user: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+async def login(user: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
 
-    db_user = db.query(models.User).filter(models.User.username == user.username).first()
+    db_user_query = select(models.User).filter(models.User.username == user.username)
+
+    db_user_result = await db.execute(db_user_query)
+
+    db_user = db_user_result.scalar_one_or_none()
 
     if not db_user:
         raise HTTPException(
@@ -66,7 +75,7 @@ def login(user: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     }
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
 
     credential_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -87,7 +96,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credential_exception
     
 
-    db_user = db.query(models.User).filter(models.User.username == tokenData.username).first()
+    db_user_query = select(models.User).filter(models.User.username == tokenData.username)
+
+    db_user_result = await db.execute(db_user_query)
+
+    db_user = db_user_result.scalar_one_or_none()
 
     if not db_user:
         raise credential_exception
