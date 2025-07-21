@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 from .. import models, schemas
 from ..database import get_db
 from . import auth
@@ -22,32 +23,14 @@ async def create_post(post: schemas.PostCreate, db: AsyncSession = Depends(get_d
 @router.get('/posts', response_model=list[schemas.Post], status_code=status.HTTP_200_OK)
 async def get_posts(step: int=0, limit: int=100, db: AsyncSession = Depends(get_db)):
 
-    results_start = (
-        select(
-            models.Post,
-            func.count(models.Like.id).label('likes_count')
-        )
-        .outerjoin(models.Like, models.Post.id == models.Like.post_id)
-        .group_by(models.Post.id)
-        .order_by(models.Post.created_at.desc())
-        .offset(step)
-        .limit(limit)
-    )
+    results_start = select(models.Post).options(joinedload(models.Post.owner)).order_by(models.Post.created_at.desc()).offset(step).limit(limit)
+    
 
     results_data = await db.execute(results_start)
 
-    results = results_data.all()
+    posts = results_data.scalars().all()
 
-    posts_with_likes = []
-    for post, likes_count in results:
-        post_with_likes_schema = schemas.Post.model_validate(
-            post,
-            update={'likes_count': likes_count or 0}
-        )
-
-        posts_with_likes.append(post_with_likes_schema)
-
-    return posts_with_likes
+    return posts
 
 
 @router.put('/post/{post_id}', response_model=schemas.Post, status_code=status.HTTP_200_OK)
@@ -70,9 +53,15 @@ async def update_post(post_id: int, update_post: schemas.PostBase, db: AsyncSess
             detail='Недостаточно прав для редактирования поста.'
         )
     
-    post_query.update(update_post.dict(), synchronize_session=False)
+    
+    post_update = update_post.model_dump(exclude_unset=True)
+
+    for key, value in post_update.items():
+        setattr(db_post, key, value)
 
     await db.commit()
+
+    await db.refresh(db_post)
 
     return db_post
 
@@ -99,7 +88,7 @@ async def delete_post(post_id: int, db: AsyncSession = Depends(get_db), current_
             detail='У вас недостаточно прав на удаление этого поста!'
         )
     
-    db.delete(db_post)
+    await db.delete(db_post)
 
     await db.commit()
 
@@ -109,14 +98,16 @@ async def delete_post(post_id: int, db: AsyncSession = Depends(get_db), current_
 @router.post('/post/{post_id}/like')
 async def like(post_id: int, db: AsyncSession = Depends(get_db), current_user = Depends(auth.get_current_user)):
     
-    post_db = await db.query(models.Post).filter(models.Post.id == post_id).first()
+    
+
+    post_db = await db.get(models.Post, post_id)
 
     if not post_db:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Нет поста"
         )
-    
+
     existing_like_query = select(models.Like).filter(models.Like.post_id == post_id, models.Like.user_id == current_user.id)
 
     existing_like_result = await db.execute(existing_like_query)
@@ -126,9 +117,11 @@ async def like(post_id: int, db: AsyncSession = Depends(get_db), current_user = 
     if not existing_like:
         new_like = models.Like(post_id=post_id, user_id=current_user.id)
         db.add(new_like)
+        post_db.likes_count += 1
         await db.commit()
         return {'detail': 'Лайк поставлен'}
     else:
         await db.delete(existing_like)
+        post_db.likes_count -= 1
         await db.commit()
         return {'detail': 'Лайк убран'}

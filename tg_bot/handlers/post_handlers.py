@@ -4,10 +4,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from ..keyboards.inline_kb import get_inline_kb
 from ..core.config import settings
+from .auth_handlers import users_token
 
 
 API_BASE_URL = settings.api_base_url
-users_token = {}
 
 class CreatePostStates(StatesGroup):
     waiting_for_title = State()

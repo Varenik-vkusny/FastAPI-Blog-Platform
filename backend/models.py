@@ -11,6 +11,7 @@ class Post(Base):
     title = Column(String, index=True)
     content = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow())
+    likes_count = Column(Integer, nullable=False, server_default='0')
 
     owner_id = Column(Integer, ForeignKey('users.id'))
 
