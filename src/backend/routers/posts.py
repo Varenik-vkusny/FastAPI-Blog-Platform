@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 from .. import models, schemas
 from ..database import get_db
 from . import auth
@@ -11,7 +11,7 @@ router = APIRouter()
 @router.post('/posts', response_model=schemas.Post, status_code=status.HTTP_201_CREATED)
 async def create_post(post: schemas.PostCreate, db: AsyncSession = Depends(get_db), current_user = Depends(auth.get_current_user)):
 
-    new_post = models.Post(**post.dict(), owner_id = current_user.id)
+    new_post = models.Post(**post.model_dump(), owner_id = current_user.id)
 
     db.add(new_post)
     await db.commit()
@@ -23,7 +23,7 @@ async def create_post(post: schemas.PostCreate, db: AsyncSession = Depends(get_d
 @router.get('/posts', response_model=list[schemas.Post], status_code=status.HTTP_200_OK)
 async def get_posts(step: int=0, limit: int=100, db: AsyncSession = Depends(get_db)):
 
-    results_start = select(models.Post).options(joinedload(models.Post.owner)).order_by(models.Post.created_at.desc()).offset(step).limit(limit)
+    results_start = select(models.Post).options(selectinload(models.Post.owner)).order_by(models.Post.created_at.desc()).offset(step).limit(limit)
     
 
     results_data = await db.execute(results_start)
@@ -97,8 +97,6 @@ async def delete_post(post_id: int, db: AsyncSession = Depends(get_db), current_
 
 @router.post('/post/{post_id}/like')
 async def like(post_id: int, db: AsyncSession = Depends(get_db), current_user = Depends(auth.get_current_user)):
-    
-    
 
     post_db = await db.get(models.Post, post_id)
 

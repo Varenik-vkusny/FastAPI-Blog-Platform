@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Optional
 
@@ -21,8 +21,7 @@ class User(BaseModel):
     id: int
     username: str
 
-    class Config():
-        from_attributes=True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Post(PostBase):
@@ -31,16 +30,14 @@ class Post(PostBase):
     owner: User
     likes_count: int=0
 
-    class Config():
-        from_attributes=True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Token(BaseModel):
     access_token: str
     token_type: str
 
-    class Config():
-        from_attributes=True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TokenData(BaseModel):
