@@ -61,7 +61,7 @@ async def test_authenticate_user(client: AsyncClient, test_user: models.User):
 
 
 @pytest.mark.anyio
-async def test_not_seuccessful_username(client: AsyncClient):
+async def test_not_successful_username(client: AsyncClient):
     
     data = {
         'username': 'some_user',
@@ -87,4 +87,3 @@ async def test_not_successful_password(client: AsyncClient, test_user: models.Us
 
     assert response.status_code == 401
     assert response.json()['detail'] == 'Неправильный ник или пароль'
-
