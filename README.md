@@ -5,9 +5,6 @@
 
 A modern backend for a blog platform with a full-featured Telegram bot as the primary client.
 
-
-<!-- Replace this with a link to your own GIF or screenshot! This is very important. -->
-
 ---
 
 ## 🚀 About The Project
