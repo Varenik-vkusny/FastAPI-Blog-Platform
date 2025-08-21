@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     algorithm: str
     secret_key: str
     token_access_expire_minutes: int
+    bot_token: str
 
     model_config = SettingsConfigDict(env_file = '.env', extra = 'ignore')
 

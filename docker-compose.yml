@@ -10,3 +10,10 @@ services:
 
     env_file:
       - .env
+
+  bot:
+    build: .
+    command: ['python', '-m', 'src.tg_bot.main_bot']
+
+    env_file:
+      - .env
