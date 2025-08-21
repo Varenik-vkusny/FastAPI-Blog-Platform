@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, status, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from .. import models, schemas
-from ..database import get_db
 from . import auth
+from ..dependencies import get_db, get_post_by_owner_id
 
 router = APIRouter()
 
@@ -34,18 +34,7 @@ async def get_posts(step: int=0, limit: int=100, db: AsyncSession = Depends(get_
 
 
 @router.put('/post/{post_id}', response_model=schemas.Post, status_code=status.HTTP_200_OK)
-async def update_post(post_id: int, update_post: schemas.PostBase, db: AsyncSession = Depends(get_db), current_user = Depends(auth.get_current_user)):
-
-    post_query = select(models.Post).filter(models.Post.id == post_id)
-    db_post_result = await db.execute(post_query)
-
-    db_post = db_post_result.scalar_one_or_none()
-
-    if not db_post:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f'Пост №{post_id} не найден!'
-        )
+async def update_post(update_post: schemas.PostBase, db: AsyncSession = Depends(get_db), current_user = Depends(auth.get_current_user), db_post: models.Post = Depends(get_post_by_owner_id)):
     
     if db_post.owner_id != current_user.id:
         raise HTTPException(
@@ -68,19 +57,7 @@ async def update_post(post_id: int, update_post: schemas.PostBase, db: AsyncSess
 
 
 @router.delete('/post/{post_id}', status_code=status.HTTP_200_OK)
-async def delete_post(post_id: int, db: AsyncSession = Depends(get_db), current_user = Depends(auth.get_current_user)):
-
-    db_post_query = select(models.Post).filter(models.Post.id == post_id)
-
-    db_post_result = await db.execute(db_post_query)
-
-    db_post = db_post_result.scalar_one_or_none()
-
-    if not db_post:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f'Пост №{post_id} не найден!'
-        )
+async def delete_post(db: AsyncSession = Depends(get_db), current_user = Depends(auth.get_current_user), db_post: models.Post = Depends(get_post_by_owner_id)):
     
     if current_user.id != db_post.owner_id:
         raise HTTPException(
@@ -92,7 +69,7 @@ async def delete_post(post_id: int, db: AsyncSession = Depends(get_db), current_
 
     await db.commit()
 
-    return {'detail': f'Пост №{post_id} успешно удален!'}
+    return {'detail': f'Пост №{db_post.id} успешно удален!'}
 
 
 @router.post('/post/{post_id}/like')
