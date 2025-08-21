@@ -3,7 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from httpx import AsyncClient, ASGITransport
 from typing import AsyncGenerator
-from src.backend.database import Base, get_db
+from src.backend.database import Base
+from src.backend.dependencies import get_db
 from src.backend.main import app
 from src.backend import models
 

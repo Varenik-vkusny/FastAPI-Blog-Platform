@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from jose import JWTError, jwt
 from .. import models, schemas, security
-from ..database import get_db
+from ..dependencies import get_db, get_user_by_username
 
 router = APIRouter(
     tags=['Authorization']
@@ -16,11 +16,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
 @router.post('/register', response_model=schemas.User, status_code=status.HTTP_201_CREATED)
 async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
 
-    user_db_query = select(models.User).filter(models.User.username == user.username)
-
-    user_db_result = await db.execute(user_db_query)
-
-    user_db = user_db_result.scalar_one_or_none()
+    user_db = await get_user_by_username(user.username, db)
 
     if user_db:
         raise HTTPException(
@@ -43,11 +39,7 @@ async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db))
 @router.post('/token', response_model=schemas.Token, status_code=status.HTTP_200_OK)
 async def login(user: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
 
-    db_user_query = select(models.User).filter(models.User.username == user.username)
-
-    db_user_result = await db.execute(db_user_query)
-
-    db_user = db_user_result.scalar_one_or_none()
+    db_user = await get_user_by_username(user.username, db)
 
     if not db_user:
         raise HTTPException(
