@@ -11,9 +11,38 @@ services:
     env_file:
       - .env
 
+    depends_on:
+      db:
+        condition: service_healthy
+
   bot:
     build: .
     command: ['python', '-m', 'src.tg_bot.main_bot']
 
     env_file:
       - .env
+    
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+    env_file:
+      - .env.db
+
+    ports:
+      - "5433:5432"
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

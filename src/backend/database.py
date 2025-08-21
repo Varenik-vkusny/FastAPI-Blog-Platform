@@ -14,6 +14,7 @@ engine = create_async_engine(
 AsyncSessionLocal = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
 Base = declarative_base()
+from . import models
 
 async def get_db():
     async with AsyncSessionLocal() as session:
