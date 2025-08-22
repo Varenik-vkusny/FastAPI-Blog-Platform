@@ -10,6 +10,9 @@ main_kb = ReplyKeyboardMarkup(
         [
             KeyboardButton(text='Посты'),
             KeyboardButton(text='Создать пост')
+        ],
+        [
+            KeyboardButton(text='Мои посты')
         ]
     ]
 )

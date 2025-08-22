@@ -1,10 +1,12 @@
+import redis.asyncio as redis
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from .. import models, schemas
 from . import auth
-from ..dependencies import get_db, get_post_by_owner_id
+from ..dependencies import get_db, get_post_by_id, get_posts_by_user_id
+from ..clients import get_redis_client
 
 router = APIRouter()
 
@@ -25,7 +27,6 @@ async def get_posts(step: int=0, limit: int=100, db: AsyncSession = Depends(get_
 
     results_start = select(models.Post).options(selectinload(models.Post.owner)).order_by(models.Post.created_at.desc()).offset(step).limit(limit)
     
-
     results_data = await db.execute(results_start)
 
     posts = results_data.scalars().all()
@@ -33,8 +34,22 @@ async def get_posts(step: int=0, limit: int=100, db: AsyncSession = Depends(get_
     return posts
 
 
+@router.get('/user/posts', response_model=list[schemas.Post], status_code=status.HTTP_200_OK)
+async def get_user_posts(current_user = Depends(auth.get_current_user), redis_client: redis.Redis = Depends(get_redis_client), db: AsyncSession = Depends(get_db)):
+    
+    posts = await get_posts_by_user_id(current_user.id, redis_client, db)
+
+    if not posts:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='У вас пока нет постов'
+        )
+    
+    return posts
+
+
 @router.put('/post/{post_id}', response_model=schemas.Post, status_code=status.HTTP_200_OK)
-async def update_post(update_post: schemas.PostBase, db: AsyncSession = Depends(get_db), current_user = Depends(auth.get_current_user), db_post: models.Post = Depends(get_post_by_owner_id)):
+async def update_post(update_post: schemas.PostBase, db: AsyncSession = Depends(get_db), current_user = Depends(auth.get_current_user), db_post: models.Post = Depends(get_post_by_id)):
     
     if db_post.owner_id != current_user.id:
         raise HTTPException(
@@ -57,7 +72,7 @@ async def update_post(update_post: schemas.PostBase, db: AsyncSession = Depends(
 
 
 @router.delete('/post/{post_id}', status_code=status.HTTP_200_OK)
-async def delete_post(db: AsyncSession = Depends(get_db), current_user = Depends(auth.get_current_user), db_post: models.Post = Depends(get_post_by_owner_id)):
+async def delete_post(db: AsyncSession = Depends(get_db), current_user = Depends(auth.get_current_user), db_post: models.Post = Depends(get_post_by_id)):
     
     if current_user.id != db_post.owner_id:
         raise HTTPException(

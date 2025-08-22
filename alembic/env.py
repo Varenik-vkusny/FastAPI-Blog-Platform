@@ -9,7 +9,9 @@ from sqlalchemy.ext.asyncio import create_async_engine
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.backend.database import Base
-from src.backend.config import settings
+from src.backend.config import get_settings
+
+settings = get_settings()
 
 from alembic import context
 

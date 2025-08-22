@@ -259,3 +259,57 @@ async def test_like_post(authenticated_client: AsyncClient, db_session: AsyncSes
 
     assert response.status_code == 200
     assert response.json()['detail'] == 'Лайк поставлен'
+
+
+@pytest.mark.anyio
+async def test_get_user_posts(authenticated_client: AsyncClient, db_session: AsyncSession, test_user: models.User):
+
+    new_post = models.Post(id=25, title='user_title', content='user_post', owner_id=test_user.id)
+
+    db_session.add(new_post)
+    await db_session.commit()
+
+    response = await authenticated_client.get(f'/user/posts')
+
+    assert response.status_code == 200
+    
+    data = response.json()
+
+    assert isinstance(data, list)
+    assert data[0]['owner']['id'] == test_user.id
+
+
+@pytest.mark.anyio
+async def test_not_authenticated_get(client: AsyncClient):
+
+    response = await client.get('/user/posts')
+
+    assert response.status_code == 401
+    assert response.json()['detail'] == 'Not authenticated'
+
+
+@pytest.mark.anyio
+async def test_no_user_posts_get(db_session: AsyncSession, client: AsyncClient):
+
+    from src.backend.security import hash_password
+
+    new_user = models.User(id=25, username='new_user', password_hash=hash_password('new_pass'))
+
+    db_session.add(new_user)
+    await db_session.commit()
+
+    data = {
+        'username': new_user.username,
+        'password': 'new_pass'
+    }
+
+    response = await client.post('/token', data=data)
+
+    access_token = response.json()['access_token']
+
+    client.headers['Authorization'] = f'Bearer {access_token}'
+
+    response = await client.get('/user/posts')
+
+    assert response.status_code == 404
+    assert response.json()['detail'] == 'У вас пока нет постов'
