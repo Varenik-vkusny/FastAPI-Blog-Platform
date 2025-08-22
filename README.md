@@ -3,6 +3,8 @@
 
 # ✒️ FastAPI & Telegram Bot: Blog Platform
 
+[![Start Python tests](https://github.com/Varenik-vkusny/FastAPI_with_TgBot/actions/workflows/ci.yml/badge.svg)](https://github.com/Varenik-vkusny/FastAPI_with_TgBot/actions/workflows/ci.yml)
+
 A modern backend for a blog platform with a full-featured Telegram bot as the primary client.
 
 ---
