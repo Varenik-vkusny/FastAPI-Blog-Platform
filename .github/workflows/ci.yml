@@ -1,0 +1,52 @@
+name: Start Python tests
+
+on:
+    push:
+        branches: ['main']
+    pull_request:
+        branches: ['main']
+
+
+jobs:
+    biuld: 
+        runs-on: ubuntu-latest
+
+        services:
+            redis:
+                image: redis:8-alpine
+
+                options: >-
+                    --health-cmd "redis-cli ping"
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
+
+                ports:
+                    - '6381:6379'
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v3
+            
+            - name: Set up Python
+              uses: actions/setup-python@v4
+              with:
+                python-version: '3.12'
+
+            - name: Install dependencies
+              run: |
+                python -m pip install --upgrade pip
+                pip install -r requirements.txt
+
+            - name: Create .env file for tests
+              run: |
+                echo "DATABASE_URL=sqlite+aiosqlite:///:memory:" >> .env
+                echo "REDIS_URL=redis://localhost:6381/1" >> .env
+                echo "ALGORITHM=HS256" >> .env
+                echo "SECRET_KEY=test_secret_key_for_jwt_tokens" >> .env
+                echo "BOT_TOKEN=fake_token" >> .env
+                echo "TOKEN_ACCESS_EXPIRE_MINUTES=30" >> .env
+                echo "API_BASE_URL=http://test" >> .env
+
+            - name: Run tests
+              run: pytest
