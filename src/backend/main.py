@@ -1,7 +1,12 @@
 import logging
+import redis.asyncio as redis
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from .routers import auth, posts
+from . import clients
+from .config import get_settings
+
+settings = get_settings()
 
 logging.basicConfig(level=logging.INFO)
 
@@ -9,6 +14,11 @@ logging.basicConfig(level=logging.INFO)
 async def lifespan(app: FastAPI):
 
     logging.info('Приложение запускается')
+
+    logging.info('Инициализирую redis_client')
+
+    clients.redis_client = redis.from_url(settings.redis_url, encoding='utf-8', decode_responses=True)
+
 
     yield
 

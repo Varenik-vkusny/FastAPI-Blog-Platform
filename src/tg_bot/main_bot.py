@@ -1,8 +1,10 @@
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher
-from src.backend.config import settings
+from src.backend.config import get_settings
 from .handlers import auth_handlers, registration_handlers, post_handlers, common
+
+settings = get_settings()
 
 logging.basicConfig(level=logging.INFO)
 

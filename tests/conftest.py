@@ -1,4 +1,5 @@
 import pytest
+import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from httpx import AsyncClient, ASGITransport
@@ -7,6 +8,10 @@ from src.backend.database import Base
 from src.backend.dependencies import get_db
 from src.backend.main import app
 from src.backend import models
+from src.backend.config import get_settings, get_test_settings
+from src.backend.clients import get_redis_client
+
+app.dependency_overrides[get_settings] = get_test_settings
 
 TEST_DATABASE = 'sqlite+aiosqlite:///:memory:'
 
@@ -18,6 +23,14 @@ TestAsyncLocalSession = sessionmaker(bind=test_engine, class_=AsyncSession, expi
 @pytest.fixture(scope='session')
 def anyio_backend():
     return 'asyncio'
+
+
+async def override_redis_client():
+
+    test_settings = get_test_settings()
+    return redis.from_url(test_settings.redis_url)
+
+app.dependency_overrides[get_redis_client] = override_redis_client
 
 
 @pytest.fixture(autouse=True, scope='function')

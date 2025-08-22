@@ -58,6 +58,40 @@ async def get_posts_handler(message: types.Message, state: FSMContext):
             await message.answer('Не удалось подключиться к серверу')
 
 
+@router.message(F.text == 'Мои посты')
+async def get_user_posts_handler(message: types.Message):
+
+    access_token = users_token.get(message.from_user.id)
+
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(f'{API_BASE_URL}/user/posts', headers=headers)
+
+            response.raise_for_status()
+
+            posts = response.json()
+
+            for post in posts:
+                text = (f'📄 *{post['title']}*\n\n'
+                        f'{post['content']}\n\n'
+                        f'Автор: {post['owner']['username']} | {post['created_at']}')
+                
+                post_id = post['id']
+                likes_count = post.get('likes_count', 0)
+                
+                await message.answer(text=text, parse_mode='Markdown', reply_markup=get_inline_kb(post_id=post_id, current_likes=likes_count))
+                
+        except httpx.RequestError:
+            await message.answer('Не удалось подключиться к серверу')
+        except httpx.HTTPError as e:
+            error_detail = response.json().get('detail', 'Неизвестная ошибка')
+            await message.answer(error_detail)
+
+
 # ---LIKE HANDLER BLOCK---
 @router.callback_query(F.data.startswith('like_'))
 async def like_handler(callback: types.CallbackQuery):

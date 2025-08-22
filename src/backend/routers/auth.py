@@ -1,3 +1,4 @@
+import redis.asyncio as redis
 from fastapi import APIRouter, status, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,6 +6,7 @@ from sqlalchemy import select
 from jose import JWTError, jwt
 from .. import models, schemas, security
 from ..dependencies import get_db, get_user_by_username
+from ..clients import get_redis_client
 
 router = APIRouter(
     tags=['Authorization']
