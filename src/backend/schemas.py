@@ -26,7 +26,7 @@ class User(BaseModel):
 
 class Post(PostBase):
     id: int
-    created_at: datetime
+    created_at: Optional[datetime] = None
     owner: User
     likes_count: int=0
 
