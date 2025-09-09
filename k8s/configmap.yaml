@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: fastapi-with-bot
+data:
+  ALGORITHM: "HS256"
+  TOKEN_ACCESS_EXPIRE_MINUTES: "30"
+  IS_IN_DOCKER: "1"
+  API_BASE_URL: "http://web:8000"
+
+  DB_DRIVER: "postgresql+asyncpg"
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "blogdb"
+
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"

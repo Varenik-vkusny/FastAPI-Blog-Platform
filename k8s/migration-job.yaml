@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migration-job
+  namespace: fastapi-with-bot
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+
+      initContainers:
+        - name: check-db
+
+          image: postgres:17
+
+          command: [
+              "sh",
+              "-c",
+              'until pg_isready -h postgres-service -p 5432;
+              do echo "Waiting for PostgreSQL to be ready...";
+              sleep 2;
+              done && echo "PostgreSQL is ready, waiting 5 seconds for stabilization..." && sleep 5',
+            ]
+
+      containers:
+        - name: migration-container
+          image: varenikvkusny/fastapi-with-bot:1.0
+          command: ["alembic", "upgrade", "head"]
+
+          envFrom:
+            - configMapRef:
+                name: app-config
+
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: SECRET_KEY
+
+            - name: BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: BOT_TOKEN
+
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_USER
+
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_PASSWORD
+
+  backoffLimit: 4
