@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  namespace: fastapi-with-bot
+spec:
+  ingressClassName: nginx
+
+  rules:
+    - host: fastapi-with-bot.local
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: app-service
+                port:
+                  number: 8000
