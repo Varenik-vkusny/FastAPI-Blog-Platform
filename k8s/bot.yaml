@@ -15,6 +15,9 @@ spec:
       containers:
         - name: app-container
           image: varenikvkusny/fastapi-with-bot:1.0
+
+          command: ["python", "-m", "src.tg_bot.main_bot"]
+
           resources:
             requests:
               memory: "64Mi"
@@ -41,16 +44,3 @@ spec:
                 secretKeyRef:
                   name: app-secret
                   key: BOT_TOKEN
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: bot-service
-  namespace: fastapi-with-bot
-spec:
-  selector:
-    app: bot
-  ports:
-    - port: 8000
-      targetPort: 8000
