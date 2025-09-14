@@ -24,7 +24,7 @@ spec:
 
       containers:
         - name: migration-container
-          image: varenikvkusny/fastapi-with-bot:1.0
+          image: varenikvkusny/fastapi-with-bot:1.2
           command: ["alembic", "upgrade", "head"]
 
           envFrom:

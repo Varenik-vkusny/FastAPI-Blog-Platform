@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: app-container
-          image: varenikvkusny/fastapi-with-bot:1.0
+          image: varenikvkusny/fastapi-with-bot:1.2
           resources:
             requests:
               memory: "64Mi"
@@ -64,6 +64,9 @@ kind: Service
 metadata:
   name: app-service
   namespace: fastapi-with-bot
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
 spec:
   selector:
     app: app

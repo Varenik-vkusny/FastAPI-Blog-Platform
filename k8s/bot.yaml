@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: app-container
-          image: varenikvkusny/fastapi-with-bot:1.0
+          image: varenikvkusny/fastapi-with-bot:1.2
 
           command: ["python", "-m", "src.tg_bot.main_bot"]
 
